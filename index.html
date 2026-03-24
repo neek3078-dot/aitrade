@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1:5 Listing Sniper Bot</title>
+    <style>
+        :root { --bg: #0a0f1c; --panel: #161f33; --text: #e2e8f0; --green: #10b981; --red: #ef4444; --accent: #8b5cf6; --warn: #f59e0b; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+        header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; border-bottom: 1px solid #2d3748; padding-bottom: 15px; margin-bottom: 20px; }
+        .ticker { font-size: 1.5rem; font-weight: bold; font-family: monospace; display: flex; align-items: center; gap: 10px;}
+        .up { color: var(--green); } .down { color: var(--red); }
+        .dashboard { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media(min-width: 768px) { .dashboard { grid-template-columns: 1fr 2fr; } }
+        .card { background: var(--panel); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #2d3748; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #2d3748; }
+        th { text-transform: uppercase; font-size: 0.8rem; color: #94a3b8; }
+        button { background: var(--accent); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 1rem; transition: background 0.2s; text-transform: uppercase; letter-spacing: 1px;}
+        button:hover { background: #7c3aed; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+        .metrics { display: flex; justify-content: space-between; background: #0a0f1c; padding: 10px; border-radius: 6px; margin-top: 10px;}
+        
+        .radar { width: 12px; height: 12px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 28, 0.95); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .ai-bar-container { width: 100%; background: #2d3748; height: 8px; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .ai-bar { height: 100%; width: 50%; background: var(--accent); transition: width 0.3s ease, background 0.3s ease; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <div class="card" style="text-align: center; max-width: 450px;">
+            <h2 style="color: var(--accent);">🎯 Initialize 1:5 Sniper</h2>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Aggressive mode activated. Targets set to 4.0% Take Profit and 0.8% Stop Loss for high-volatility listings.</p>
+            <button onclick="startSystem()">Arm System & Allow Audio</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🎯 1:5 Listing Sniper</h1>
+            <div class="ticker">
+                <div class="radar" id="radar-light"></div>
+                <span id="target-coin">SCANNING...</span> 
+                <span id="target-price" style="color: #94a3b8;">$0.00</span>
+            </div>
+        </header>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h3 style="margin-top: 0; color: var(--accent);">System Telemetry</h3>
+                <p style="font-size: 0.85rem; color: #94a3b8;">Scanning Futures Directory: <b id="total-pairs" style="color: white;">0</b> Pairs Known.</p>
+                <hr style="border-color: #2d3748; margin: 15px 0;">
+                
+                <h4 style="margin-bottom: 5px;">AI Momentum Flow</h4>
+                <div class="ai-bar-container"><div class="ai-bar" id="ai-flow-bar"></div></div>
+                <p style="font-size: 0.75rem; color: #94a3b8; text-align: right; margin-top: 5px;" id="ai-status">Neutral</p>
+
+                <h4 style="margin-top: 20px;">Live K-Line Indicators</h4>
+                <div class="metrics"><span>RSI (14):</span> <strong id="rsi-val">Gathering...</strong></div>
+                <div class="metrics"><span>Trend (EMA 9/21):</span> <strong id="trend-val">Gathering...</strong></div>
+                <div class="metrics"><span>MACD (12,26,9):</span> <strong id="macd-val">Gathering...</strong></div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top: 0;">Aggressive Signals (1:5 RR)</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Coin</th>
+                                <th>Type</th>
+                                <th>Entry</th>
+                                <th>Take Profit <span style="color:var(--green); font-size:0.7rem;">(+4.0%)</span></th>
+                                <th>Stop Loss <span style="color:var(--red); font-size:0.7rem;">(-0.8%)</span></th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signal-table">
+                            <tr><td colspan="6" style="text-align:center; color: #94a3b8;">Waiting for target acquisition & TA confirmation...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isSystemActive = false;
+        let audioCtx;
+        
+        // Sniper State
+        let knownSymbols = [];
+        let activeTarget = '';
+        let activeWs = null;
+
+        // Market Data Arrays
+        let closePrices = [];
+        let macdHistory = [];
+        let currentPrice = 0;
+        let activeSignals = [];
+
+        function startSystem() {
+            document.getElementById('overlay').style.display = 'none';
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            isSystemActive = true;
+            scanForNewListings(true); 
+            setInterval(() => scanForNewListings(false), 15000); 
+        }
+
+        function playTradeBeep() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function playNewCoinSiren() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.5);
+            osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 1.0);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 1.0);
+        }
+
+        async function scanForNewListings(isInitial) {
+            try {
+                const res = await fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
+                const data = await res.json();
+                
+                const currentSymbols = data.symbols
+                    .filter(s => s.quoteAsset === 'USDT' && s.contractType === 'PERPETUAL' && s.status === 'TRADING')
+                    .map(s => s.symbol);
+
+                document.getElementById('total-pairs').innerText = currentSymbols.length;
+
+                if (isInitial) {
+                    knownSymbols = currentSymbols;
+                    lockOnTarget(currentSymbols[currentSymbols.length - 1]);
+                } else {
+                    const newCoins = currentSymbols.filter(sym => !knownSymbols.includes(sym));
+                    if (newCoins.length > 0) {
+                        knownSymbols = currentSymbols;
+                        playNewCoinSiren();
+                        lockOnTarget(newCoins[newCoins.length - 1]);
+                    }
+                }
+            } catch (err) {
+                console.error("Scanner Error:", err);
+            }
+        }
+
+        function lockOnTarget(symbol) {
+            activeTarget = symbol;
+            closePrices = [];
+            macdHistory = [];
+            currentPrice = 0;
+            
+            document.getElementById('target-coin').innerText = activeTarget;
+            document.getElementById('radar-light').style.background = 'var(--accent)';
+            document.getElementById('radar-light').style.boxShadow = '0 0 10px var(--accent)';
+
+            if (activeWs) activeWs.close();
+
+            const streamUrl = `wss://fstream.binance.com/ws/${activeTarget.toLowerCase()}@kline_1m`;
+            activeWs = new WebSocket(streamUrl);
+            
+            activeWs.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                if(!message.k) return;
+                
+                const kline = message.k;
+                currentPrice = parseFloat(kline.c);
+                document.getElementById('target-price').innerText = `$${currentPrice}`;
+
+                simulateAIMomentum(parseFloat(kline.o), parseFloat(kline.c), parseFloat(kline.h), parseFloat(kline.l));
+
+                if (kline.x) {
+                    closePrices.push(currentPrice);
+                    if (closePrices.length > 100) closePrices.shift();
+                    runTechnicalAnalysis();
+                }
+                checkTrades(currentPrice);
+            };
+        }
+
+        function simulateAIMomentum(open, close, high, low) {
+            const range = high - low === 0 ? 0.0001 : high - low;
+            const position = (close - low) / range; 
+            const score = position * 100;
+            
+            const bar = document.getElementById('ai-flow-bar');
+            const status = document.getElementById('ai-status');
+            
+            bar.style.width = `${score}%`;
+            
+            if (score > 65) { bar.style.background = 'var(--green)'; status.innerText = 'Aggressive Buying Flow'; status.style.color = 'var(--green)';}
+            else if (score < 35) { bar.style.background = 'var(--red)'; status.innerText = 'Aggressive Selling Flow'; status.style.color = 'var(--red)';}
+            else { bar.style.background = 'var(--accent)'; status.innerText = 'Neutral Consolidation'; status.style.color = '#94a3b8';}
+        }
+
+        function getEMA(data, period) {
+            if (data.length < period) return 0;
+            const k = 2 / (period + 1);
+            let ema = data[data.length - period]; 
+            for (let i = data.length - period + 1; i < data.length; i++) ema = (data[i] - ema) * k + ema;
+            return ema;
+        }
+
+        function runTechnicalAnalysis() {
+            if (closePrices.length < 35) return; 
+
+            let gains = 0, losses = 0;
+            for(let i = closePrices.length - 14; i < closePrices.length; i++) {
+                const diff = closePrices[i] - closePrices[i-1];
+                if (diff > 0) gains += diff; else losses -= diff;
+            }
+            const rs = (gains / 14) / ((losses / 14) === 0 ? 1 : (losses / 14));
+            const rsi = 100 - (100 / (1 + rs));
+            document.getElementById('rsi-val').innerText = rsi.toFixed(2);
+            document.getElementById('rsi-val').style.color = rsi > 70 ? 'var(--red)' : rsi < 30 ? 'var(--green)' : 'var(--text)';
+
+            const ema9 = getEMA(closePrices, 9);
+            const ema21 = getEMA(closePrices, 21);
+            const isEmaBullish = ema9 > ema21;
+            document.getElementById('trend-val').innerText = isEmaBullish ? 'BULLISH' : 'BEARISH';
+            document.getElementById('trend-val').style.color = isEmaBullish ? 'var(--green)' : 'var(--red)';
+
+            const ema12 = getEMA(closePrices, 12);
+            const ema26 = getEMA(closePrices, 26);
+            const macdLine = ema12 - ema26;
+            macdHistory.push(macdLine);
+            if (macdHistory.length > 50) macdHistory.shift();
+            let signalLine = macdHistory.length >= 9 ? getEMA(macdHistory, 9) : 0;
+            const isMacdBullish = (macdLine - signalLine) > 0;
+            document.getElementById('macd-val').innerText = isMacdBullish ? 'UP' : 'DOWN';
+            document.getElementById('macd-val').style.color = isMacdBullish ? 'var(--green)' : 'var(--red)';
+
+            const hasRecentSignal = activeSignals.some(s => s.status === 'Active');
+            if (!hasRecentSignal && signalLine !== 0) {
+                if (isEmaBullish && rsi < 55 && isMacdBullish) generateSignal('LONG');
+                else if (!isEmaBullish && rsi > 45 && !isMacdBullish) generateSignal('SHORT');
+            }
+        }
+
+        // --- UPDATED 1:5 AGGRESSIVE TRADING LOGIC ---
+        function generateSignal(type) {
+            playTradeBeep();
+            
+            const riskPercent = 0.008; // 0.8% Risk (Wider stop for volatility)
+            const rewardMultiplier = 5; // 1:5 Target (4.0% Take profit)
+            
+            let sl, tp;
+
+            if (type === 'LONG') {
+                sl = currentPrice * (1 - riskPercent);
+                tp = currentPrice * (1 + (riskPercent * rewardMultiplier));
+            } else {
+                sl = currentPrice * (1 + riskPercent);
+                tp = currentPrice * (1 - (riskPercent * rewardMultiplier));
+            }
+
+            if(activeSignals.length > 4) activeSignals.pop();
+
+            activeSignals.unshift({
+                id: Date.now(), coin: activeTarget, type, 
+                entry: currentPrice.toFixed(4), tp: tp.toFixed(4), sl: sl.toFixed(4), 
+                status: 'Active'
+            });
+            renderSignals();
+        }
+
+        function checkTrades(livePrice) {
+            let changed = false;
+            activeSignals.forEach(sig => {
+                if (sig.status !== 'Active' || sig.coin !== activeTarget) return;
+
+                if (sig.type === 'LONG') {
+                    if (livePrice >= sig.tp) { sig.status = 'TP Hit 🎯'; playTradeBeep(); changed = true; }
+                    if (livePrice <= sig.sl) { sig.status = 'SL Hit 🛑'; changed = true; }
+                } else {
+                    if (livePrice <= sig.tp) { sig.status = 'TP Hit 🎯'; playTradeBeep(); changed = true; }
+                    if (livePrice >= sig.sl) { sig.status = 'SL Hit 🛑'; changed = true; }
+                }
+            });
+            if (changed) renderSignals();
+        }
+
+        function renderSignals() {
+            const tbody = document.getElementById('signal-table');
+            if (activeSignals.length === 0) return;
+            tbody.innerHTML = activeSignals.map(sig => `
+                <tr style="opacity: ${sig.status === 'Active' ? '1' : '0.4'}">
+                    <td><b>${sig.coin}</b></td>
+                    <td class="${sig.type === 'LONG' ? 'up' : 'down'}"><span class="badge" style="background: rgba(${sig.type === 'LONG' ? '16, 185, 129' : '239, 68, 68'}, 0.2)">${sig.type}</span></td>
+                    <td style="font-family: monospace;">$${sig.entry}</td>
+                    <td class="up" style="font-family: monospace; font-weight:bold;">$${sig.tp}</td>
+                    <td class="down" style="font-family: monospace;">$${sig.sl}</td>
+                    <td><b>${sig.status}</b></td>
+                </tr>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
